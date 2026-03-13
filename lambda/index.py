@@ -14,6 +14,7 @@ ARTISTS = {
     "The Weeknd": "93b216mv",
 }
 BUCKET = "spotify-forecast"
+COLUMNS = ["artist", "date", "monthly_listeners", "reach"]
 LATEST_DATA = "latest_data.parquet"
 
 load_dotenv()
@@ -112,11 +113,11 @@ def handler(_event: dict[str, Any], _context: Any) -> dict[str, Any]:
              - statusCode (int): The HTTP status code indicating success or failure.
              - body (str): A message explaining the result of the execution.
     """
-    df_latest = load_data().sort("artist")
+    df_latest = load_data().select(COLUMNS).sort("artist")
 
     try:
         latest_s3_file = s3.get_object(Bucket=BUCKET, Key=LATEST_DATA)
-        df_latest_s3 = pl.read_parquet(latest_s3_file["Body"]).sort("artist")
+        df_latest_s3 = pl.read_parquet(latest_s3_file["Body"]).select(COLUMNS).sort("artist")
     except s3.exceptions.NoSuchKey:
         df_latest_s3 = pl.DataFrame()
 
