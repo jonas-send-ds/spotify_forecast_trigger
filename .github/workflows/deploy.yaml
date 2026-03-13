@@ -38,9 +38,3 @@ jobs:
           aws lambda update-function-code \
             --function-name spotify-forecast-lambda-function \
             --zip-file fileb://lambda-deployment.zip
-
-      - name: Update Lambda Environment Variables
-        run: |
-          aws lambda update-function-configuration \
-            --function-name spotify-forecast-lambda-function \
-            --environment "Variables={SONGSTATS_API_KEY=${{ secrets.SONGSTATS_API_KEY }}}"
