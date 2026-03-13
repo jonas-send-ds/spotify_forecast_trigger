@@ -1,0 +1,46 @@
+name: Deploy Lambda
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: actions-env
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies and create deployment package
+        run: |
+          pip install -r ./requirements.txt -t ./lambda/
+          cd ./lambda
+          zip -r ../lambda-deployment.zip .
+          cd ..
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ vars.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Deploy Lambda Function
+        run: |
+          aws lambda update-function-code \
+            --function-name spotify-forecast-lambda-function \
+            --zip-file fileb://lambda-deployment.zip
+
+      - name: Update Lambda Environment Variables
+        run: |
+          aws lambda update-function-configuration \
+            --function-name spotify-forecast-lambda-function \
+            --environment "Variables={SONGSTATS_API_KEY=${{ secrets.SONGSTATS_API_KEY }}}"
