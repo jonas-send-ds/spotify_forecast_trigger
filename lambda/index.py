@@ -122,8 +122,8 @@ def handler(_event: dict[str, Any], _context: Any) -> dict[str, Any]:
 
     if not df_latest.equals(df_latest_s3):
         response = ecs.run_task(
-            cluster="spotify_forecast-cluster",
-            taskDefinition="spotify_forecast-task",
+            cluster="spotify-forecast-cluster",
+            taskDefinition="spotify-forecast-task",
             launchType="FARGATE",
             networkConfiguration={
                 "awsvpcConfiguration": {
