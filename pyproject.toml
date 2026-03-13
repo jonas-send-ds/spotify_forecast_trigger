@@ -1,0 +1,80 @@
+[project]
+name = "spotify-forecast-trigger"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "jonas-send",email = "datascience@jonassend.com"}
+]
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "polars (>=1.39.0,<2.0.0)",
+    "dotenv (>=0.9.9,<0.10.0)",
+    "tqdm (>=4.67.3,<5.0.0)",
+]
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.14.2"
+notebook = "^7.5.5"
+seaborn = "^0.13.2"
+pyarrow = "^23.0.1"
+
+[tool.ruff]
+extend-include = ["*.ipynb"]
+lint.select = [
+    "A",  # flake8-builtins
+    "ANN",  # flake8-annotations
+    "ARG",  # flake8-unused-arguments
+    "ASYNC",  # flake8-async
+    "B",  # flake8-bugbear
+    "BLE",  # flake8-blind-except
+    "C4",  # flake8-comprehensions
+    "C90",  # mccabe
+    "D",  # pydocstyle
+    "DTZ",  # flake8-datetimez
+    "E",  # pycodestyle errors
+    "EM",  # flake8-errmsg
+    "EXE",  # flake8-executable
+    "F",  # pyflakes
+    "FBT",  # flake8-boolean-trap
+    "FLY",  # flynt
+    "FURB",  # refurb
+    "G",  # flake8-logging-format
+    "I",  # isort
+    "ICN",  # flake8-import-conventions
+    "ISC",  # flake8-implicit-str-concat
+    "LOG",  # flake8-logging
+    "N",  # pep8-naming
+    "NPY",  # NumPy-specific rules
+    "PIE",  # flake8-pie
+    "PL",  # Pylint
+    "PTH",  # flake8-use-pathlib
+    "Q",  # flake8-quotes
+    "RET",  # flake8-return
+    "RSE",  # flake8-raise
+    "RUF",  # Ruff-specific rules
+    "S",  # flake8-bandit
+    "SIM",  # flake8-simplify
+    "SLF",  # flake8-self
+    "T10",  # flake8-debugger
+    "TC",  # flake8-type-checking
+    "TID",  # flake8-tidy-imports
+    "TRY",  # tryceratops
+    "UP",  # pyupgrade
+    "W",  # pycodestyle warnings
+    "ERA001",  # commented out code
+    "D103",  # missing docstring in public function
+    "PLR2044",  # line with empty comment
+    "RET504",  # unnecessary assignment
+    "TD005",  # missing to-do description
+]
+lint.ignore = [
+    "D203",  # 1 blank line required before class docstring
+    "D212",  # Multi-line docstring summary should start at the first line
+    "E501",  # Line too long
+    "N816",  # mixedCase naming
+]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
