@@ -35,8 +35,8 @@ jobs:
 
       - name: Deploy Lambda Function
         run: |
-          aws s3 cp trigger-function.zip s3://spotify-forecast/function.zip
+          aws s3 cp lambda-deployment.zip s3://spotify-forecast/lambda-deployment.zip
           aws lambda update-function-code \
             --function-name spotify-forecast-lambda-function \
             --s3-bucket spotify-forecast \
-            --s3-key trigger-function.zip
+            --s3-key lambda-deployment.zip
