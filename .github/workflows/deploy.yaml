@@ -17,14 +17,14 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.12'
+          python-version: '3.14'
 
       - name: Install dependencies and create deployment package
         run: |
           pip install \
             --platform manylinux2014_x86_64 \
             --implementation cp \
-            --python-version 3.12 \
+            --python-version 3.14 \
             --only-binary=:all: \
             -r ./requirements.txt \
             -t ./lambda/
