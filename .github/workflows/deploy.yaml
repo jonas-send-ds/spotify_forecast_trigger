@@ -21,13 +21,7 @@ jobs:
 
       - name: Install dependencies and create deployment package
         run: |
-          pip install \
-            --platform manylinux2014_x86_64 \
-            --implementation cp \
-            --python-version 3.14 \
-            --only-binary=:all: \
-            -r ./requirements.txt \
-            -t ./lambda/
+          pip install -r ./requirements.txt -t ./lambda/
           cd ./lambda
           zip -r ../lambda-deployment.zip .
           cd ..
