@@ -12,6 +12,7 @@ dependencies = [
     "dotenv (>=0.9.9,<0.10.0)",
     "tqdm (>=4.67.3,<5.0.0)",
     "boto3 (>=1.42.67,<2.0.0)",
+    "gspread (>=6.2.1,<7.0.0)",
 ]
 
 [tool.poetry.group.dev.dependencies]
