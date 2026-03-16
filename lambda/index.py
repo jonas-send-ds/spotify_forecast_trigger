@@ -164,6 +164,10 @@ def load_data() -> pl.DataFrame:
     :return: df_latest: dataset containing the most recent data for each artist
     """
     df_songstats = load_songstats_data(ARTISTS).select(["date", "artist", "monthly_listeners", "reach"])
+
+    # drop rows where both listeners and reach are null
+    df_songstats = df_songstats.filter(~(pl.col("monthly_listeners").is_null() & pl.col("reach").is_null()))
+
     df_spreadsheet = load_spreadsheet_data(ARTISTS.keys())
 
     df = pl.concat([df_songstats, df_spreadsheet], how="diagonal_relaxed")
