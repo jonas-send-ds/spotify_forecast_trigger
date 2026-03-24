@@ -1,6 +1,6 @@
 
+import io
 import os
-import requests
 from typing import Iterable
 from typing import Any
 
@@ -18,7 +18,7 @@ ARTISTS = {
     "The Weeknd": "93b216mv",
 }
 BUCKET = "spotify-forecast"
-COLUMNS = ["artist", "date", "monthly_listeners", "reach"]
+COLUMNS = ["artist", "date", "monthly_listeners"]
 # TODO: find better way to handle this
 GOOGLE_CREDENTIALS = {
   "type": "service_account",
@@ -32,74 +32,13 @@ GOOGLE_CREDENTIALS = {
   "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/spotify-forecast-account%40david-spotify-forecast.iam.gserviceaccount.com",
   "universe_domain": "googleapis.com"
 }
-LATEST_DATA = "latest_data.parquet"
+LATEST_DATA_KEY = "latest_data.parquet"
 PRIVATE_KEY_IS_NOT_SET = "GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY environment variable is not set"
 SPREADSHEET_ID = "167UTVu2XVAM0MlGw-Cpw0tcMyuphC3ifJpOiC_y_a74"
 
 load_dotenv()
 s3 = boto3.client("s3")
 ecs = boto3.client("ecs")
-
-
-def load_songstats_data(artists: dict[str, str]) -> pl.DataFrame:
-    print("Loading songstats data...")
-    df_list = []
-    for artist, songstats_id in artists.items():
-        response = requests.get(
-            API_URL,
-            headers={"apikey": os.getenv("SONGSTATS_API_KEY")},
-            params={
-                "songstats_artist_id": songstats_id,
-                "source": "spotify",
-                "with_aggregates": "true",
-                "start_date": "2020-06-01"  # before that the API behaves funky with respect to reach data
-            }
-        )
-
-        df= pl.DataFrame(response.json()["stats"][0]["data"]["history"])
-        df = df.with_columns(
-            pl.col("date").str.to_date("%Y-%m-%d"),
-            pl.lit(artist).alias("artist")
-        )
-
-        df_list.append(df)
-
-    df = (pl.concat(df_list)
-            .rename({
-                "monthly_listeners_current": "monthly_listeners",
-                "playlists_current": "playlists",
-                "playlist_reach_current": "reach"
-            })
-            .sort(["date", "artist"])
-            .filter(pl.col("monthly_listeners") > 0))
-
-    df = fix_anomalies(df)
-
-    # We interpret the monthly listeners values as lagged by one day
-    return df.with_columns(
-        pl.col("monthly_listeners").shift(-1).over("artist")
-    )
-
-
-def fix_anomalies(df: pl.DataFrame) -> pl.DataFrame:
-    """
-    Manually fix data anomalies.
-
-    :param df: Dataframe to fix anomalies in
-    :return: Dataframe with anomalies fixed
-    """
-    anomaly_mask = (((pl.col("artist") == "Bruno Mars") & (pl.col("date").is_between(pl.date(2026, 2, 15), pl.date(2026, 2, 16)))) |
-                    ((pl.col("artist") == "Bad Bunny") & (pl.col("date") == pl.date(2021, 2, 16))))
-    df = df.with_columns(
-        pl.when(anomaly_mask).then(None).otherwise(pl.col("playlists")).alias("playlists"),
-        pl.when(anomaly_mask).then(None).otherwise(pl.col("reach")).alias("reach"),
-    )
-    # Linear interpolation
-    numeric_columns = [column for column, dtype in df.schema.items() if dtype.is_numeric()]
-    return df.with_columns(
-        pl.col(column).interpolate().over("artist")
-        for column in numeric_columns
-    )
 
 
 def get_credentials() -> dict:
@@ -157,33 +96,15 @@ def load_spreadsheet_data(artists: Iterable[str]) -> pl.DataFrame:
             .sort(["date", "artist"]))
 
 
-def load_data() -> pl.DataFrame:
+def load_latest_data() -> pl.DataFrame:
     """
     Loads and processes a latest dataset containing the most recent data for each artist.
 
     :return: df_latest: dataset containing the most recent data for each artist
     """
-    df_songstats = load_songstats_data(ARTISTS).select(["date", "artist", "monthly_listeners", "reach"])
+    df = load_spreadsheet_data(ARTISTS.keys()).sort("date")
 
-    # drop rows where both listeners and reach are null
-    df_songstats = df_songstats.filter(~(pl.col("monthly_listeners").is_null() & pl.col("reach").is_null()))
-
-    df_spreadsheet = load_spreadsheet_data(ARTISTS.keys())
-
-    df = pl.concat([df_songstats, df_spreadsheet], how="diagonal_relaxed")
-
-    # use monthly listeners data from spreadsheet (when available) and songstats data for reach
-    # TODO: make more robust to sorting of dataframes
-    df = (df.group_by(["date", "artist"]).agg(
-        pl.col("monthly_listeners").last(),
-        pl.col("reach").first(),
-    ).sort(["date", "artist"]))
-
-    return (df
-                 .sort("date")
-                 .with_columns(pl.all().fill_null(strategy="forward").over("artist"))
-                 .group_by("artist")
-                 .last())
+    return df.group_by("artist").last()
 
 
 # ruff: noqa: ANN401 - typing for unused parameters is unimportant
@@ -197,10 +118,10 @@ def handler(_event: dict[str, Any], _context: Any) -> dict[str, Any]:
              - statusCode (int): The HTTP status code indicating success or failure.
              - body (str): A message explaining the result of the execution.
     """
-    df_latest = load_data().select(COLUMNS).sort("artist")
+    df_latest = load_latest_data().select(COLUMNS).sort("artist")
 
     try:
-        latest_s3_file = s3.get_object(Bucket=BUCKET, Key=LATEST_DATA)
+        latest_s3_file = s3.get_object(Bucket=BUCKET, Key=LATEST_DATA_KEY)
         df_latest_s3 = pl.read_parquet(latest_s3_file["Body"]).select(COLUMNS).sort("artist")
     except s3.exceptions.NoSuchKey:
         df_latest_s3 = pl.DataFrame()
@@ -221,8 +142,18 @@ def handler(_event: dict[str, Any], _context: Any) -> dict[str, Any]:
             }
         )
 
+        buffer = io.BytesIO()
+        df_latest.write_parquet(buffer)
+        buffer.seek(0)
+
+        boto3.client("s3").put_object(
+            Bucket=BUCKET,
+            Key=LATEST_DATA_KEY,
+            Body=buffer.getvalue(),
+        )
+
         print(f"Started ECS task: {response['tasks'][0]['taskArn']}")
-        return {"statusCode": 200, "body": "Change detected and ECS task started!"}
+        return {"statusCode": 200, "body": "Change detected, ECS task started, and data updated!"}
 
     print("No change detected.")
     return {"statusCode": 200, "body": "No changes"}
