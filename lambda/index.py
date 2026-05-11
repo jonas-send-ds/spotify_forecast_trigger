@@ -80,9 +80,22 @@ def load_spreadsheet_data(artists: Iterable[str]) -> pl.DataFrame:
     worksheet = public_sheet.worksheet("Monthly Listeners")
     data = worksheet.get_all_values()  # list of lists
 
+    # Filter data before loading into dataframe to ignore (potentially erroneous, duplicated) columns:
+    desired_cols = {"Date", *artists}
+    seen = set()
+    keep_indices = []
+    for i, col in enumerate(data[0]):
+        if col in desired_cols and col not in seen:
+            seen.add(col)
+            keep_indices.append(i)
+
+    # Filter both header and rows
+    filtered_headers = [data[0][i] for i in keep_indices]
+    filtered_rows = [[row[i] for i in keep_indices] for row in data[1:]]
+
     df = pl.DataFrame(
-        data[1:],
-        schema=data[0],  # first row as column names
+        filtered_rows,
+        schema=filtered_headers,
         orient="row",
     )
 
